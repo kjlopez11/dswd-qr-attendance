@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>QR Attendance</title>
+<style>
+:root{color-scheme:light dark;--bg:light-dark(#f5f7fb,#111827);--card:light-dark(#fff,#1f2937);--text:light-dark(#111827,#f9fafb);--muted:light-dark(#6b7280,#9ca3af);--border:light-dark(#e5e7eb,#374151);--accent:#2563eb;--ok:#15803d;--warn:#b45309;--danger:#b91c1c}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,sans-serif;color:var(--text)}#app{min-height:100vh;background:var(--bg)}.wrap{max-width:720px;margin:auto;padding:20px}.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;margin-bottom:14px;box-shadow:0 6px 24px #00000010}h1{margin:0 0 6px;font-size:25px}.muted{color:var(--muted);font-size:14px}.reader{position:relative;overflow:hidden;border-radius:16px;background:#000;aspect-ratio:4/3}.reader video{width:100%;height:100%;object-fit:cover}.scanbox{position:absolute;inset:18% 12%;border:3px solid #fff;border-radius:18px;box-shadow:0 0 0 999px #0005}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}input,button,textarea{font:inherit}input{width:100%;padding:13px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text)}button{border:0;border-radius:10px;padding:13px 15px;background:var(--accent);color:#fff;font-weight:700;cursor:pointer}button.secondary{background:light-dark(#e5e7eb,#374151);color:var(--text)}button.danger{background:var(--danger)}.result{text-align:center;padding:16px;border-radius:14px;background:light-dark(#eff6ff,#172554)}.big{font-size:27px;font-weight:800;margin:8px}.ok{color:var(--ok)}.warn{color:var(--warn)}.dangerText{color:var(--danger)}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px;border-bottom:1px solid var(--border);text-align:left}th{font-weight:700}.hidden{display:none}.pill{display:inline-block;padding:5px 9px;border-radius:99px;background:light-dark(#dcfce7,#14532d)}details summary{cursor:pointer;font-weight:700}.hint{font-size:12px;color:var(--muted);margin-top:8px}
+</style>
+</head>
+<body><div id="app"><div class="wrap">
+<div class="card"><h1>QR Attendance</h1><div class="muted">Scan a person's QR code. First scan today = Time In; second scan = Time Out.</div></div>
+<div class="card">
+  <div class="reader"><video id="video" playsinline muted></video><div class="scanbox"></div></div>
+  <div class="row" style="margin-top:10px"><button id="start">Start Camera</button><button class="secondary" id="stop">Stop Camera</button></div>
+  <div class="hint">Camera scanning requires a secure context (HTTPS or localhost) and browser support for BarcodeDetector. Use the manual box below if the browser does not support it.</div>
+</div>
+<div class="card"><label for="qr"><b>QR ID</b></label><div class="row" style="margin-top:8px"><input id="qr" placeholder="e.g. DSWD001" autocomplete="off"><button id="record">Record</button></div></div>
+<div class="card result"><div id="name">Ready to scan</div><div class="big" id="action">—</div><div id="details" class="muted">No attendance recorded yet.</div></div>
+<div class="card"><details><summary>People</summary><p class="muted">Edit the sample people below or import a CSV. Format: QR_ID,Name,Office/Team,Active</p><textarea id="peopleCsv" rows="7" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text)">QR_ID,Name,Office/Team,Active
+DSWD001,Charles Dean G. Ocampo,PSWAD,YES
+DSWD002,Kathleen Mae H. Marzan,PSWAD,YES
+DSWD003,Mariel A. Gatchalian,PSWAD,YES
+DSWD004,Jennyfie T. Fernandez,PSWAD,YES
+DSWD005,Maricel R. Ped,PSWAD,YES
+DSWD006,Mark Adrian B. Mayugba,PSWAD,YES
+DSWD007,Kim James A. Lopez,PSWAD,YES
+DSWD008,Gelenie May B. Agwiking,PSWAD,YES</textarea><button id="savePeople" style="margin-top:10px">Save People</button></details></div>
+<div class="card"><div class="row"><b>Today's Attendance</b><button class="secondary" id="download">Download Today CSV</button></div><div style="overflow:auto;margin-top:10px"><table><thead><tr><th>QR ID</th><th>Name</th><th>Time In</th><th>Time Out</th><th>Hours</th></tr></thead><tbody id="tbody"></tbody></table></div></div>
+<div class="card"><details><summary>Admin Panel</summary><p class="muted">Administrative tools for managing attendance records stored in this browser.</p><div class="row" style="margin-top:10px"><button class="secondary" id="exportAll">Export All Records to CSV</button><button class="danger" id="resetToday">Reset Today's Attendance</button></div><div class="hint">Resetting today's attendance removes only records for today. Export All Records includes attendance from all dates saved on this device.</div></details></div>
+<div class="card"><button class="danger" id="clear">Clear ALL attendance data on this device</button></div>
+</div></div>
+<script>
+const $=id=>document.getElementById(id);
+const peopleKey='qrPeopleV2', attKey='qrAttendanceV1';
+let people=JSON.parse(localStorage.getItem(peopleKey)||'null')||[
+ {id:'DSWD001',name:'Charles Dean G. Ocampo',office:'PSWAD',active:true},
+ {id:'DSWD002',name:'Kathleen Mae H. Marzan',office:'PSWAD',active:true},
+ {id:'DSWD003',name:'Mariel A. Gatchalian',office:'PSWAD',active:true},
+ {id:'DSWD004',name:'Jennyfie T. Fernandez',office:'PSWAD',active:true},
+ {id:'DSWD005',name:'Maricel R. Ped',office:'PSWAD',active:true},
+ {id:'DSWD006',name:'Mark Adrian B. Mayugba',office:'PSWAD',active:true},
+ {id:'DSWD007',name:'Kim James A. Lopez',office:'PSWAD',active:true},
+ {id:'DSWD008',name:'Gelenie May B. Agwiking',office:'PSWAD',active:true}
+];
+let stream=null, detector=null, scanning=false, lastScan='', lastScanAt=0;
+function dayKey(d=new Date()){return d.toLocaleDateString('en-CA')}
+function timeText(d){return d.toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit',second:'2-digit'})}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function save(){localStorage.setItem(peopleKey,JSON.stringify(people))}
+function getAtt(){return JSON.parse(localStorage.getItem(attKey)||'[]')}
+function setAtt(a){localStorage.setItem(attKey,JSON.stringify(a))}
+function record(qr){qr=String(qr||'').trim(); if(!qr)return;
+ const p=people.find(x=>x.id.toUpperCase()===qr.toUpperCase()); const now=new Date();
+ $('qr').value='';
+ if(!p){$('name').textContent='Unknown QR ID';$('action').textContent='INVALID QR';$('action').className='big dangerText';$('details').textContent=qr+' is not in the People list.';return}
+ if(!p.active){$('name').textContent=p.name;$('action').textContent='INACTIVE';$('action').className='big warn';$('details').textContent='This person is marked inactive.';return}
+ let a=getAtt(); const today=dayKey(now); let r=a.find(x=>x.date===today&&x.qr===p.id);
+ if(!r){r={date:today,qr:p.id,name:p.name,timeIn:now.toISOString(),timeOut:null};a.push(r);$('action').textContent='TIME IN';$('action').className='big ok';$('details').textContent=`${p.name} • ${timeText(now)}`}
+ else if(!r.timeOut){r.timeOut=now.toISOString();$('action').textContent='TIME OUT';$('action').className='big ok';$('details').textContent=`${p.name} • ${timeText(now)}`}
+ else{$('action').textContent='COMPLETED';$('action').className='big warn';$('details').textContent=`${p.name} already has Time In and Time Out today.`}
+ setAtt(a);render();
+}
+function render(){const today=dayKey(), a=getAtt().filter(x=>x.date===today);$('tbody').innerHTML=a.map(r=>{let ti=new Date(r.timeIn),to=r.timeOut?new Date(r.timeOut):null;let h=to?((to-ti)/3600000):0;return `<tr><td>${esc(r.qr)}</td><td>${esc(r.name)}</td><td>${timeText(ti)}</td><td>${to?timeText(to):'—'}</td><td>${to?h.toFixed(2):'—'}</td></tr>`}).join('')||'<tr><td colspan="5" class="muted">No records today.</td></tr>'}
+$('record').onclick=()=>record($('qr').value);$('qr').addEventListener('keydown',e=>{if(e.key==='Enter')record($('qr').value)});
+$('savePeople').onclick=()=>{try{const lines=$('peopleCsv').value.trim().split(/\r?\n/).slice(1);people=lines.map(line=>{const [id,name,office,active]=line.split(',');return{id:(id||'').trim(),name:(name||'').trim(),office:(office||'').trim(),active:(active||'YES').trim().toUpperCase()==='YES'}}).filter(x=>x.id&&x.name);save();$('details').textContent=`Saved ${people.length} people.`}catch(e){$('details').textContent='Could not read the CSV.'}};
+function downloadCsv(records, filename){const rows=[['Date','QR_ID','Name','Time In','Time Out','Hours Worked']];records.forEach(r=>{let ti=new Date(r.timeIn),to=r.timeOut?new Date(r.timeOut):null;rows.push([r.date,r.qr,r.name,timeText(ti),to?timeText(to):'',to?((to-ti)/3600000).toFixed(2):''])});const csv=rows.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(',')).join('\n');const blob=new Blob([csv],{type:'text/csv'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+$('download').onclick=()=>downloadCsv(getAtt().filter(x=>x.date===dayKey()),'attendance-'+dayKey()+'.csv');
+$('exportAll').onclick=()=>{const all=getAtt();if(!all.length){alert('There are no attendance records to export.');return}downloadCsv(all,'attendance-all-records.csv')};
+$('resetToday').onclick=()=>{const today=dayKey(),a=getAtt(),count=a.filter(x=>x.date===today).length;if(!count){alert('There are no attendance records for today.');return}if(confirm(`Reset ${count} attendance record(s) for today? This cannot be undone.`)){setAtt(a.filter(x=>x.date!==today));render();$('name').textContent='Ready to scan';$('action').textContent='RESET';$('action').className='big warn';$('details').textContent=`Today's attendance was reset.`}};
+$('clear').onclick=()=>{if(confirm('Delete ALL attendance records stored on this device? This cannot be undone.')){localStorage.removeItem(attKey);render()}};
+async function startCamera(){if(!('BarcodeDetector' in window)){alert('This browser does not support BarcodeDetector. Use the QR ID box or Chrome on a supported Android device.');return}try{detector=new BarcodeDetector({formats:['qr_code']});stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});$('video').srcObject=stream;await $('video').play();scanning=true;scanLoop()}catch(e){alert('Camera could not start. Allow camera permission and use HTTPS/localhost.')}}
+async function scanLoop(){if(!scanning)return;try{const codes=await detector.detect($('video'));if(codes.length){const v=codes[0].rawValue||'';const now=Date.now();if(v!==lastScan||now-lastScanAt>3000){lastScan=v;lastScanAt=now;record(v)}}}catch(e){}requestAnimationFrame(scanLoop)}
+function stopCamera(){scanning=false;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('video').srcObject=null}
+$('start').onclick=startCamera;$('stop').onclick=stopCamera;render();
+</script></body></html>
